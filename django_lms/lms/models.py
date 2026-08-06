@@ -23,7 +23,6 @@ class Course(models.Model):
     def __str__(self):
         return self.name
 
-
     class Meta:
         verbose_name = "курс"
         verbose_name_plural = "курсы"
@@ -62,7 +61,6 @@ class Lesson(models.Model):
     def __str__(self):
         return self.name
 
-
     class Meta:
-        verbose_name="урок"
-        verbose_name_plural="уроки"
+        verbose_name = "урок"
+        verbose_name_plural = "уроки"
