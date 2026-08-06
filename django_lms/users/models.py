@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
+from lms.models import Course, Lesson
+
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -70,3 +72,46 @@ class User(AbstractUser):
     class Meta:
         verbose_name = "пользователь"
         verbose_name_plural = "пользователи"
+
+
+class Payment(models.Model):
+
+    CASH = "cash"
+    TRANSFER = "transfer"
+
+    PAYMENT_METHODS = [
+        (CASH, "Наличные"),
+        (TRANSFER, "Перевод"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name="Пользователь",
+    )
+
+    payment_date = models.DateField(
+        verbose_name="Дата оплаты",
+    )
+
+    course = models.ForeignKey(Course, on_delete=models.SET_NULL, blank=True, null=True)
+
+    lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+    )
+
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHODS,
+    )
+
+    def __str__(self):
+        return f"{self.user} - {self.amount}"
