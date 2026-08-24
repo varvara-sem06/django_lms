@@ -9,6 +9,8 @@ from .views import (
     LessonRetrieveAPIView,
     LessonUpdateAPIView,
     CourseSubscriptionAPIView,
+    CoursePaymentAPIView,
+    CoursePaymentStatusAPIView,
 )
 
 router = DefaultRouter()
@@ -45,5 +47,15 @@ urlpatterns = [
         "courses/<int:course_id>/subscribe/",
         CourseSubscriptionAPIView.as_view(),
         name="course-subscribe",
-    )
+    ),
+    path(
+        "courses/<int:course_id>/pay/",
+        CoursePaymentAPIView.as_view(),
+        name="course-payment",
+    ),
+        path(
+        "payments/<str:session_id>/status/",
+        CoursePaymentStatusAPIView.as_view(),
+        name="course-payment-status",
+    ),
 ]

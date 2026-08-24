@@ -11,11 +11,19 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.viewsets import ModelViewSet
 
 from .models import Course, Lesson, Subscription
 from .permissions import IsModeratorOrOwner
 from .serializers import CourseSerializer, LessonSerializer
 from .paginators import CourseLessonPagination
+from .services import(
+    create_stripe_price,
+    create_stripe_product,
+    create_checkout_session,
+    retrieve_checkout_session,
+)
 
 
 class CourseViewSet(ModelViewSet):
@@ -26,6 +34,23 @@ class CourseViewSet(ModelViewSet):
         IsAuthenticated,
         IsModeratorOrOwner,
     ]
+
+    @swagger_auto_schema(
+        operation_summary="Список курсов",
+        operation_description="Возвращает список всех курсов."
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="Создать курс",
+        operation_description="Создает новый курс.",
+        request_body=CourseSerializer,
+        responses={201: CourseSerializer},
+    )
+
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         user = self.request.user
@@ -57,6 +82,14 @@ class LessonListAPIView(ListAPIView):
         IsModeratorOrOwner,
     ]
 
+    @swagger_auto_schema(
+        operation_summary="Список уроков",
+        operation_description="Возвращает список уроков.",
+    )
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
         user = self.request.user
 
@@ -75,6 +108,15 @@ class LessonRetrieveAPIView(RetrieveAPIView):
 
     queryset = Lesson.objects.all()
 
+    @swagger_auto_schema(
+        operation_summary="Получить урок",
+        operation_description="Возвращает информацию об одном уроке.",
+        responses={200: LessonSerializer},
+    )
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
 
 class LessonCreateAPIView(CreateAPIView):
     serializer_class = LessonSerializer
@@ -84,6 +126,15 @@ class LessonCreateAPIView(CreateAPIView):
     ]
 
     queryset = Lesson.objects.all()
+
+    @swagger_auto_schema(
+        operation_summary="Создать урок",
+        request_body=LessonSerializer,
+        responses={201: LessonSerializer},
+    )
+
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         if self.request.user.groups.filter(name="Moderators").exists():
@@ -101,6 +152,24 @@ class LessonUpdateAPIView(UpdateAPIView):
 
     queryset = Lesson.objects.all()
 
+    @swagger_auto_schema(
+        operation_summary="Обновить урок",
+        request_body=LessonSerializer,
+        responses={200: LessonSerializer},
+    )
+
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_summary="Частично обновить урок",
+        request_body=LessonSerializer,
+        responses={200: LessonSerializer},
+    )
+
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
 
 class LessonDestroyAPIView(DestroyAPIView):
     serializer_class = LessonSerializer
@@ -111,6 +180,14 @@ class LessonDestroyAPIView(DestroyAPIView):
 
     queryset = Lesson.objects.all()
 
+    @swagger_auto_schema(
+        operation_summary="Удалить урок",
+        responses={204: "No Content"},
+    )
+
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
+
     def perform_destroy(self, instance):
         if self.request.user.groups.filter(name="Moderators").exists():
             raise PermissionDenied("Модераторы не могут удалять уроки.")
@@ -120,6 +197,12 @@ class LessonDestroyAPIView(DestroyAPIView):
 
 class CourseSubscriptionAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Подписаться на урок",
+        operation_description="Создает подписку пользователя на курс",
+        responses={200: "Подписка уже существует.", 201: "Подписка создана."},
+    )
 
     def post(self, request, course_id):
         course = Course.objects.get(pk=course_id)
@@ -134,6 +217,12 @@ class CourseSubscriptionAPIView(APIView):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
             )
 
+    @swagger_auto_schema(
+        operation_summary="Отписаться от курса",
+        operation_description="Удаляет подписку пользователя на курс",
+        responses={204: "Подписка удалена."},
+    )
+
     def delete(self, request, course_id):
         subscription = Subscription.objects.filter(
             user=request.user,
@@ -146,4 +235,52 @@ class CourseSubscriptionAPIView(APIView):
         return Response(
             {"subscribed": False},
             status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class CoursePaymentAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Оплата курса",
+        operation_description="Создает Stripe Checkout Session и возвращает ссылку на оплату.",
+        responses={201: "Ссылка на оплату создана."},
+    )
+    def post(self, request, course_id):
+        course = Course.objects.get(pk=course_id)
+
+        product = create_stripe_product(course)
+
+        price = create_stripe_price(
+            product,
+            course,
+        )
+
+        session = create_checkout_session(price)
+
+        return Response(
+            {
+                "payment_url": session.url,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CoursePaymentStatusAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Проверить статус оплаты",
+        operation_description="Возвращает информацию о Stripe Checkout Session.",
+    )
+    def get(self, request, session_id):
+        session = retrieve_checkout_session(session_id)
+
+        return Response(
+            {
+                "id": session.id,
+                "status": session.status,
+                "payment_status": session.payment_status,
+            },
+            status=status.HTTP_200_OK,
         )
