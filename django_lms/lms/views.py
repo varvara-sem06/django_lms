@@ -1,29 +1,24 @@
+from datetime import timedelta
+
+from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.generics import (
-    CreateAPIView,
-    DestroyAPIView,
-    ListAPIView,
-    RetrieveAPIView,
-    UpdateAPIView,
-)
+from rest_framework.generics import (CreateAPIView, DestroyAPIView,
+                                     ListAPIView, RetrieveAPIView,
+                                     UpdateAPIView)
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
-from drf_yasg.utils import swagger_auto_schema
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Course, Lesson, Subscription
+from .paginators import CourseLessonPagination
 from .permissions import IsModeratorOrOwner
 from .serializers import CourseSerializer, LessonSerializer
-from .paginators import CourseLessonPagination
-from .services import(
-    create_stripe_price,
-    create_stripe_product,
-    create_checkout_session,
-    retrieve_checkout_session,
-)
+from .services import (create_checkout_session, create_stripe_price,
+                       create_stripe_product, retrieve_checkout_session)
+from .tasks import send_course_update
 
 
 class CourseViewSet(ModelViewSet):
@@ -37,7 +32,7 @@ class CourseViewSet(ModelViewSet):
 
     @swagger_auto_schema(
         operation_summary="Список курсов",
-        operation_description="Возвращает список всех курсов."
+        operation_description="Возвращает список всех курсов.",
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
@@ -48,7 +43,6 @@ class CourseViewSet(ModelViewSet):
         request_body=CourseSerializer,
         responses={201: CourseSerializer},
     )
-
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
 
@@ -72,6 +66,12 @@ class CourseViewSet(ModelViewSet):
 
         instance.delete()
 
+    def perform_update(self, serializer):
+        course = serializer.save()
+
+        if timezone.now() - course.updated_at > timedelta(hours=4):
+            send_course_update.delay(course.id)
+
 
 class LessonListAPIView(ListAPIView):
     queryset = Lesson.objects.all()
@@ -86,7 +86,6 @@ class LessonListAPIView(ListAPIView):
         operation_summary="Список уроков",
         operation_description="Возвращает список уроков.",
     )
-
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
@@ -113,9 +112,22 @@ class LessonRetrieveAPIView(RetrieveAPIView):
         operation_description="Возвращает информацию об одном уроке.",
         responses={200: LessonSerializer},
     )
-
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+
+class LessonViewSet(ModelViewSet):
+
+    def perform_update(self, serializer):
+        lesson = serializer.save()
+
+        course = lesson.course
+
+        if timezone.now() - course.updated_at > timedelta(hours=4):
+            send_course_update.delay(course.id)
+
+        course.updated_at = timezone.now()
+        course.save(update_fields=["updated_at"])
 
 
 class LessonCreateAPIView(CreateAPIView):
@@ -132,7 +144,6 @@ class LessonCreateAPIView(CreateAPIView):
         request_body=LessonSerializer,
         responses={201: LessonSerializer},
     )
-
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
@@ -157,7 +168,6 @@ class LessonUpdateAPIView(UpdateAPIView):
         request_body=LessonSerializer,
         responses={200: LessonSerializer},
     )
-
     def put(self, request, *args, **kwargs):
         return super().put(request, *args, **kwargs)
 
@@ -166,7 +176,6 @@ class LessonUpdateAPIView(UpdateAPIView):
         request_body=LessonSerializer,
         responses={200: LessonSerializer},
     )
-
     def patch(self, request, *args, **kwargs):
         return super().patch(request, *args, **kwargs)
 
@@ -184,7 +193,6 @@ class LessonDestroyAPIView(DestroyAPIView):
         operation_summary="Удалить урок",
         responses={204: "No Content"},
     )
-
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
 
@@ -203,7 +211,6 @@ class CourseSubscriptionAPIView(APIView):
         operation_description="Создает подписку пользователя на курс",
         responses={200: "Подписка уже существует.", 201: "Подписка создана."},
     )
-
     def post(self, request, course_id):
         course = Course.objects.get(pk=course_id)
 
@@ -213,16 +220,15 @@ class CourseSubscriptionAPIView(APIView):
         )
 
         return Response(
-            {"subscribed":True},
+            {"subscribed": True},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-            )
+        )
 
     @swagger_auto_schema(
         operation_summary="Отписаться от курса",
         operation_description="Удаляет подписку пользователя на курс",
         responses={204: "Подписка удалена."},
     )
-
     def delete(self, request, course_id):
         subscription = Subscription.objects.filter(
             user=request.user,

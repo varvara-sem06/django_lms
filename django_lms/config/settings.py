@@ -1,5 +1,7 @@
-from pathlib import Path
 import os
+from pathlib import Path
+
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -124,3 +126,19 @@ REST_FRAMEWORK = {
 
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+
+CELERY_BROKER_URL = "redis://localhost:6379"
+CELERY_RESULT_BACKEND = "redis://localhost:6379"
+
+CELERY_TIMEZONE = "Europe/Moscow"
+
+CELERY_TASK_TRACK_STARTED = True
+
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+CELERY_BEAT_SCHEDULE = {
+    "deactivate-inactive-users": {
+        "task": "users.tasks.deactivate_inactive_users",
+        "schedule": crontab(hour=0, minute=0),
+    },
+}
