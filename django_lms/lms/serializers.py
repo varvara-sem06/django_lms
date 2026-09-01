@@ -5,10 +5,7 @@ from .validators import validate_youtube_url
 
 
 class LessonSerializer(serializers.ModelSerializer):
-    video_url = serializers.URLField(
-        validators=[validate_youtube_url]
-    )
-    
+    video_url = serializers.URLField(validators=[validate_youtube_url])
 
     class Meta:
         model = Lesson
@@ -51,9 +48,4 @@ class CourseSerializer(serializers.ModelSerializer):
         if not request or request.user.is_anonymous:
             return False
 
-        return Subscription.objects.filter(
-            user=request.user,
-            course=obj
-        ).exists()
-
-    
+        return Subscription.objects.filter(user=request.user, course=obj).exists()

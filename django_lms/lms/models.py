@@ -28,6 +28,8 @@ class Course(models.Model):
         verbose_name="Описание",
     )
 
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return self.name
 
@@ -95,7 +97,6 @@ class Subscription(models.Model):
         related_name="subscriptions",
         verbose_name="Курс",
     )
-
 
     class Meta:
         constraints = [

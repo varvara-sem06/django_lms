@@ -1,17 +1,11 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import (
-    CourseViewSet,
-    LessonCreateAPIView,
-    LessonDestroyAPIView,
-    LessonListAPIView,
-    LessonRetrieveAPIView,
-    LessonUpdateAPIView,
-    CourseSubscriptionAPIView,
-    CoursePaymentAPIView,
-    CoursePaymentStatusAPIView,
-)
+from .views import (CoursePaymentAPIView, CoursePaymentStatusAPIView,
+                    CourseSubscriptionAPIView, CourseViewSet,
+                    LessonCreateAPIView, LessonDestroyAPIView,
+                    LessonListAPIView, LessonRetrieveAPIView,
+                    LessonUpdateAPIView)
 
 router = DefaultRouter()
 router.register("courses", CourseViewSet, basename="course")
@@ -53,7 +47,7 @@ urlpatterns = [
         CoursePaymentAPIView.as_view(),
         name="course-payment",
     ),
-        path(
+    path(
         "payments/<str:session_id>/status/",
         CoursePaymentStatusAPIView.as_view(),
         name="course-payment-status",

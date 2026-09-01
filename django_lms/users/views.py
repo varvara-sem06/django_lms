@@ -7,7 +7,8 @@ from rest_framework.viewsets import ModelViewSet
 
 from .models import Payment
 from .permissions import IsOwnerOrReadOnly
-from .serializers import PaymentSerializer, UserRegisterSerializer, UserSerializer
+from .serializers import (PaymentSerializer, UserRegisterSerializer,
+                          UserSerializer)
 
 User = get_user_model()
 
