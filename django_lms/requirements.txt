@@ -14,3 +14,10 @@ psycopg2-binary==2.9.12
 python-dotenv==1.2.2
 pytokens==0.4.1
 sqlparse==0.5.5
+celery
+django-celery-beat
+redis
+drf-yasg
+django-cors-headers
+djangorestframework-simplejwt
+stripe
