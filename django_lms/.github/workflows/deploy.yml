@@ -43,7 +43,7 @@ jobs:
 
   deploy:
     needs: test
-    if: github.ref == 'refs/heads/feature/celery'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -56,7 +56,7 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             cd ~/django_lms
-            git pull origin feature/celery
+            git pull origin main
             cd django_lms
             source venv/bin/activate
             python manage.py migrate
