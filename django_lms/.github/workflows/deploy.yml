@@ -1,0 +1,63 @@
+name: Django CI/CD
+
+on:
+  push:
+    branches: [main, develop, feature/celery]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: django_lms
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+
+    env:
+      SECRET_KEY: test-secret-key
+      DEBUG: True
+      DB_NAME: django_lms
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r django_lms/requirements.txt
+
+      - run: |
+          cd django_lms
+          python manage.py migrate
+          python manage.py test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/feature/celery'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd ~/django_lms
+            git pull origin feature/celery
+            cd django_lms
+            source venv/bin/activate
+            python manage.py migrate
+            sudo systemctl restart django_lms
