@@ -1,4 +1,3 @@
-cat > README.md <<'EOF'
 # Django LMS
 
 Учебный проект на Django REST Framework с PostgreSQL и автоматическим CI/CD через GitHub Actions.
